@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>GridWeaver - IoT Microgrid</title>
+
+    <!-- Leaflet CSS -->
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 15px;
+        }
+
+        #map {
+            height: 85vh;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>GridWeaver - Virtual IoT Microgrid</h1>
+
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+    </script>
+
+    <script>
+
+        // Initialize map
+        const map = L.map('map').setView([12.9716, 77.5946], 12);
+
+        // OpenStreetMap layer
+        L.tileLayer(
+            'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            {
+                attribution: '&copy; OpenStreetMap contributors'
+            }
+        ).addTo(map);
+
+        // Mock IoT grid nodes
+        const nodes = [
+            { id: "device-1", lat: 12.9716, lng: 77.5946 },
+            { id: "device-2", lat: 12.9816, lng: 77.6046 },
+            { id: "device-3", lat: 12.9616, lng: 77.5846 },
+            { id: "device-4", lat: 12.9916, lng: 77.6146 },
+            { id: "device-5", lat: 12.9516, lng: 77.5746 }
+        ];
+
+        // Add static markers
+        nodes.forEach(node => {
+
+            L.marker([node.lat, node.lng])
+                .addTo(map)
+                .bindPopup(
+                    "<b>IoT Node</b><br>" +
+                    "Device ID: " + node.id + "<br>" +
+                    "Status: Online"
+                );
+
+        });
+
+    </script>
+
+</body>
+</html>
