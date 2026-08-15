@@ -5,11 +5,14 @@ import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class IoTLoadTest {
 
-    private static final int TOTAL_CONNECTIONS = 100;
+    private static final int TOTAL_CONNECTIONS = 10_000;
+
     private static final String WEBSOCKET_URL =
             "ws://localhost:8080/ws/telemetry";
 
@@ -17,7 +20,11 @@ public class IoTLoadTest {
 
         HttpClient client = HttpClient.newHttpClient();
 
-        List<CompletableFuture<WebSocket>> connections =
+        // Virtual threads for handling many WebSocket connection tasks
+        ExecutorService virtualThreadExecutor =
+                Executors.newVirtualThreadPerTaskExecutor();
+
+        List<Future<WebSocket>> connections =
                 new ArrayList<>();
 
         System.out.println(
@@ -29,47 +36,52 @@ public class IoTLoadTest {
 
             int deviceId = i;
 
-            CompletableFuture<WebSocket> connection =
-                    client.newWebSocketBuilder()
-                            .buildAsync(
-                                    URI.create(WEBSOCKET_URL),
-                                    new WebSocket.Listener() {
+            Future<WebSocket> connection =
+                    virtualThreadExecutor.submit(() -> {
 
-                                        @Override
-                                        public void onOpen(
-                                                WebSocket webSocket) {
+                        return client.newWebSocketBuilder()
+                                .buildAsync(
+                                        URI.create(WEBSOCKET_URL),
 
-                                            System.out.println(
-                                                    "Device " +
-                                                    deviceId +
-                                                    " connected"
-                                            );
+                                        new WebSocket.Listener() {
 
-                                            webSocket.sendText(
-                                                    "{\"deviceId\":\"device-" +
-                                                    deviceId +
-                                                    "\",\"power\":100}",
-                                                    true
-                                            );
+                                            @Override
+                                            public void onOpen(
+                                                    WebSocket webSocket) {
 
-                                            WebSocket.Listener.super
-                                                    .onOpen(webSocket);
+                                                System.out.println(
+                                                        "Device " +
+                                                        deviceId +
+                                                        " connected"
+                                                );
+
+                                                webSocket.sendText(
+                                                        "{\"deviceId\":\"device-"
+                                                                + deviceId
+                                                                + "\",\"power\":100}",
+                                                        true
+                                                );
+
+                                                WebSocket.Listener.super
+                                                        .onOpen(webSocket);
+                                            }
+
+                                            @Override
+                                            public void onError(
+                                                    WebSocket webSocket,
+                                                    Throwable error) {
+
+                                                System.out.println(
+                                                        "Device " +
+                                                        deviceId +
+                                                        " error: " +
+                                                        error.getMessage()
+                                                );
+                                            }
                                         }
-
-                                        @Override
-                                        public void onError(
-                                                WebSocket webSocket,
-                                                Throwable error) {
-
-                                            System.out.println(
-                                                    "Device " +
-                                                    deviceId +
-                                                    " error: " +
-                                                    error.getMessage()
-                                            );
-                                        }
-                                    }
-                            );
+                                )
+                                .join();
+                    });
 
             connections.add(connection);
 
@@ -80,18 +92,29 @@ public class IoTLoadTest {
             }
         }
 
-        CompletableFuture.allOf(
-                connections.toArray(new CompletableFuture[0])
-        ).join();
+        // Wait for all connection attempts
+        for (Future<WebSocket> connection : connections) {
+            try {
+                connection.get();
+            } catch (Exception e) {
+                System.out.println(
+                        "Connection failed: " +
+                        e.getMessage()
+                );
+            }
+        }
 
         System.out.println(
                 "All WebSocket connection attempts completed."
         );
 
+        // Keep connections alive for 30 seconds
         Thread.sleep(30_000);
 
         System.out.println(
                 "Load test finished."
         );
+
+        virtualThreadExecutor.shutdown();
     }
 }
