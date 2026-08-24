@@ -1,82 +1,875 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>GridWeaver - IoT Microgrid</title>
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>GridWeaver - Live IoT Grid</title>
 
     <!-- Leaflet CSS -->
     <link
         rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    >
+    />
 
     <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             font-family: Arial, sans-serif;
+            background: #f4f6f8;
         }
 
-        h1 {
-            text-align: center;
-            margin: 15px;
+        header {
+            background: #1f2937;
+            color: white;
+            padding: 18px 25px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        header p {
+            margin: 5px 0 0;
+            font-size: 14px;
+            color: #d1d5db;
+        }
+
+        .dashboard {
+            display: flex;
+            height: calc(100vh - 82px);
+        }
+
+        .sidebar {
+            width: 300px;
+            background: white;
+            padding: 20px;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .sidebar h2 {
+            margin-top: 0;
+        }
+
+        .connection {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            background: #fee2e2;
+            color: #991b1b;
+            font-weight: bold;
+        }
+
+        .connection.connected {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .stat {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            background: #f3f4f6;
+        }
+
+        .stat strong {
+            display: block;
+            font-size: 20px;
+            margin-top: 4px;
+        }
+
+        .legend {
+            margin-top: 25px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .charging {
+            background: #22c55e;
+        }
+
+        .discharging {
+            background: #ef4444;
+        }
+
+        .low-battery {
+            background: #f59e0b;
+        }
+
+        .idle {
+            background: #3b82f6;
         }
 
         #map {
-            height: 85vh;
-            width: 100%;
+            flex: 1;
+            height: 100%;
         }
+
+        .device-popup {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
     </style>
+
 </head>
+
 
 <body>
 
-    <h1>GridWeaver - Virtual IoT Microgrid</h1>
+<header>
+
+    <h1>GridWeaver</h1>
+
+    <p>
+        Virtual Thread IoT Microgrid State Engine
+    </p>
+
+</header>
+
+
+<div class="dashboard">
+
+
+    <!-- SIDEBAR -->
+
+    <div class="sidebar">
+
+        <h2>Live Grid Status</h2>
+
+
+        <div id="connectionStatus"
+             class="connection">
+
+            WebSocket: Connecting...
+
+        </div>
+
+
+        <div class="stat">
+
+            Devices Updated
+
+            <strong id="deviceCount">
+                0
+            </strong>
+
+        </div>
+
+
+        <div class="stat">
+
+            Last Device
+
+            <strong id="lastDevice">
+                -
+            </strong>
+
+        </div>
+
+
+        <div class="stat">
+
+            Last Power
+
+            <strong id="lastPower">
+                -
+            </strong>
+
+        </div>
+
+
+        <div class="stat">
+
+            Current State
+
+            <strong id="lastState">
+                -
+            </strong>
+
+        </div>
+
+
+        <div class="legend">
+
+            <h3>Battery States</h3>
+
+
+            <div class="legend-item">
+
+                <span class="dot charging"></span>
+
+                CHARGING
+
+            </div>
+
+
+            <div class="legend-item">
+
+                <span class="dot discharging"></span>
+
+                DISCHARGING
+
+            </div>
+
+
+            <div class="legend-item">
+
+                <span class="dot low-battery"></span>
+
+                LOW BATTERY
+
+            </div>
+
+
+            <div class="legend-item">
+
+                <span class="dot idle"></span>
+
+                IDLE
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- MAP -->
 
     <div id="map"></div>
 
-    <!-- Leaflet JS -->
-    <script
-        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
-    </script>
 
-    <script>
+</div>
 
-        // Initialize map
-        const map = L.map('map').setView([12.9716, 77.5946], 12);
 
-        // OpenStreetMap layer
-        L.tileLayer(
-            'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+<!-- Leaflet JS -->
+
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
+
+
+<script>
+
+
+// ==================================================
+// MAP INITIALIZATION
+// ==================================================
+
+const map = L.map("map").setView(
+    [12.9716, 77.5946],
+    11
+);
+
+
+L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+        attribution:
+            "&copy; OpenStreetMap contributors"
+    }
+).addTo(map);
+
+
+// ==================================================
+// DEVICE MARKERS
+// ==================================================
+
+const markers = {};
+
+
+// Maximum markers shown on the map.
+// This prevents thousands of markers from
+// slowing down the browser during load testing.
+
+const MAX_MARKERS = 100;
+
+
+// Count all telemetry messages received.
+
+let deviceCount = 0;
+
+
+// ==================================================
+// INITIAL DEVICES
+// ==================================================
+
+const initialDevices = [
+
+    {
+        id: "device-1",
+        lat: 12.9716,
+        lng: 77.5946
+    },
+
+    {
+        id: "device-2",
+        lat: 12.9850,
+        lng: 77.6050
+    },
+
+    {
+        id: "device-3",
+        lat: 12.9500,
+        lng: 77.5800
+    },
+
+    {
+        id: "device-4",
+        lat: 13.0000,
+        lng: 77.6200
+    },
+
+    {
+        id: "device-5",
+        lat: 12.9300,
+        lng: 77.6000
+    }
+
+];
+
+
+// ==================================================
+// CREATE INITIAL MARKERS
+// ==================================================
+
+initialDevices.forEach(function(device) {
+
+    createMarker(
+        device.id,
+        device.lat,
+        device.lng,
+        "IDLE",
+        0
+    );
+
+});
+
+
+// ==================================================
+// CREATE MARKER
+// ==================================================
+
+function createMarker(
+    deviceId,
+    lat,
+    lng,
+    state,
+    power
+) {
+
+    const color =
+        getStateColor(state);
+
+
+    const marker =
+        L.circleMarker(
+            [lat, lng],
             {
-                attribution: '&copy; OpenStreetMap contributors'
+
+                radius: 9,
+
+                color: color,
+
+                fillColor: color,
+
+                fillOpacity: 0.8,
+
+                weight: 2
+
             }
         ).addTo(map);
 
-        // Mock IoT grid nodes
-        const nodes = [
-            { id: "device-1", lat: 12.9716, lng: 77.5946 },
-            { id: "device-2", lat: 12.9816, lng: 77.6046 },
-            { id: "device-3", lat: 12.9616, lng: 77.5846 },
-            { id: "device-4", lat: 12.9916, lng: 77.6146 },
-            { id: "device-5", lat: 12.9516, lng: 77.5746 }
-        ];
 
-        // Add static markers
-        nodes.forEach(node => {
+    marker.bindPopup(
+        createPopup(
+            deviceId,
+            state,
+            power
+        )
+    );
 
-            L.marker([node.lat, node.lng])
-                .addTo(map)
-                .bindPopup(
-                    "<b>IoT Node</b><br>" +
-                    "Device ID: " + node.id + "<br>" +
-                    "Status: Online"
-                );
+
+    markers[deviceId] = {
+
+        marker: marker,
+
+        lat: lat,
+
+        lng: lng,
+
+        state: state,
+
+        power: power
+
+    };
+
+}
+
+
+// ==================================================
+// GENERATE LOCATION
+// ==================================================
+
+function generateLocation(deviceId) {
+
+    let hash = 0;
+
+
+    for (
+        let i = 0;
+        i < deviceId.length;
+        i++
+    ) {
+
+        hash =
+            deviceId.charCodeAt(i)
+            +
+            ((hash << 5) - hash);
+
+    }
+
+
+    const lat =
+        12.90 +
+        (Math.abs(hash) % 1500) / 10000;
+
+
+    const lng =
+        77.50 +
+        (Math.abs(hash * 7) % 2000) / 10000;
+
+
+    return {
+
+        lat: lat,
+
+        lng: lng
+
+    };
+
+}
+
+
+// ==================================================
+// UPDATE MARKER
+// ==================================================
+
+function updateMarker(
+    deviceId,
+    state,
+    power
+) {
+
+
+    // ------------------------------------------------
+    // DEVICE ALREADY EXISTS
+    // ------------------------------------------------
+
+    if (markers[deviceId]) {
+
+        const device =
+            markers[deviceId];
+
+
+        const color =
+            getStateColor(state);
+
+
+        // Change marker colour
+
+        device.marker.setStyle({
+
+            color: color,
+
+            fillColor: color
 
         });
 
-    </script>
+
+        // Update popup
+
+        device.marker.setPopupContent(
+
+            createPopup(
+                deviceId,
+                state,
+                power
+            )
+
+        );
+
+
+        // Store latest state
+
+        device.state =
+            state;
+
+        device.power =
+            power;
+
+
+        return;
+
+    }
+
+
+    // ------------------------------------------------
+    // NEW DEVICE
+    // ------------------------------------------------
+
+    const currentMarkerCount =
+        Object.keys(markers).length;
+
+
+    // Don't create unlimited markers.
+
+    if (
+        currentMarkerCount >= MAX_MARKERS
+    ) {
+
+        console.log(
+            "Marker limit reached. " +
+            "Telemetry still processed for: "
+            + deviceId
+        );
+
+        return;
+
+    }
+
+
+    // Generate deterministic location
+
+    const location =
+        generateLocation(deviceId);
+
+
+    createMarker(
+
+        deviceId,
+
+        location.lat,
+
+        location.lng,
+
+        state,
+
+        power
+
+    );
+
+}
+
+
+// ==================================================
+// CREATE POPUP
+// ==================================================
+
+function createPopup(
+    deviceId,
+    state,
+    power
+) {
+
+    return `
+
+        <div class="device-popup">
+
+            <b>IoT Device</b>
+
+            <br><br>
+
+            <b>Device ID:</b>
+            ${deviceId}
+
+            <br>
+
+            <b>Power:</b>
+            ${power}
+
+            <br>
+
+            <b>State:</b>
+            ${state}
+
+        </div>
+
+    `;
+
+}
+
+
+// ==================================================
+// STATE COLORS
+// ==================================================
+
+function getStateColor(state) {
+
+    switch (state) {
+
+
+        case "CHARGING":
+
+            return "#22c55e";
+
+
+        case "DISCHARGING":
+
+            return "#ef4444";
+
+
+        case "LOW_BATTERY":
+
+            return "#f59e0b";
+
+
+        case "IDLE":
+
+            return "#3b82f6";
+
+
+        default:
+
+            return "#6b7280";
+
+    }
+
+}
+
+
+// ==================================================
+// WEBSOCKET
+// ==================================================
+
+let socket;
+
+
+function connectWebSocket() {
+
+
+    socket =
+        new WebSocket(
+            "ws://localhost:8080/ws/telemetry"
+        );
+
+
+    // ------------------------------------------------
+    // CONNECTED
+    // ------------------------------------------------
+
+    socket.onopen = function() {
+
+
+        console.log(
+            "WebSocket connected"
+        );
+
+
+        const status =
+            document.getElementById(
+                "connectionStatus"
+            );
+
+
+        status.innerText =
+            "WebSocket: Connected";
+
+
+        status.classList.add(
+            "connected"
+        );
+
+    };
+
+
+    // ------------------------------------------------
+    // RECEIVE TELEMETRY
+    // ------------------------------------------------
+
+    socket.onmessage =
+        function(event) {
+
+
+        console.log(
+            "Telemetry received:",
+            event.data
+        );
+
+
+        try {
+
+
+            const data =
+                JSON.parse(
+                    event.data
+                );
+
+
+            const deviceId =
+                data.deviceId;
+
+
+            const power =
+                data.power;
+
+
+            const state =
+                data.state;
+
+
+            // ----------------------------------------
+            // UPDATE MAP
+            // ----------------------------------------
+
+            updateMarker(
+
+                deviceId,
+
+                state,
+
+                power
+
+            );
+
+
+            // ----------------------------------------
+            // UPDATE DASHBOARD
+            // ----------------------------------------
+
+            deviceCount++;
+
+
+            document.getElementById(
+                "deviceCount"
+            ).innerText =
+                deviceCount;
+
+
+            document.getElementById(
+                "lastDevice"
+            ).innerText =
+                deviceId;
+
+
+            document.getElementById(
+                "lastPower"
+            ).innerText =
+                power;
+
+
+            document.getElementById(
+                "lastState"
+            ).innerText =
+                state;
+
+
+        }
+
+        catch(error) {
+
+
+            console.error(
+
+                "Invalid telemetry:",
+
+                error
+
+            );
+
+        }
+
+    };
+
+
+    // ------------------------------------------------
+    // ERROR
+    // ------------------------------------------------
+
+    socket.onerror =
+        function(error) {
+
+
+        console.error(
+            "WebSocket error:",
+            error
+        );
+
+    };
+
+
+    // ------------------------------------------------
+    // DISCONNECTED
+    // ------------------------------------------------
+
+    socket.onclose =
+        function() {
+
+
+        console.log(
+            "WebSocket disconnected"
+        );
+
+
+        const status =
+            document.getElementById(
+                "connectionStatus"
+            );
+
+
+        status.innerText =
+            "WebSocket: Disconnected";
+
+
+        status.classList.remove(
+            "connected"
+        );
+
+
+        // Reconnect after 3 seconds
+
+        setTimeout(
+            connectWebSocket,
+            3000
+        );
+
+    };
+
+}
+
+
+// ==================================================
+// START WEBSOCKET
+// ==================================================
+
+connectWebSocket();
+
+
+</script>
 
 </body>
+
 </html>
