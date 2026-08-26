@@ -77,4 +77,17 @@ class BatteryStateMachineTest {
                 machine.getCurrentState()
         );
     }
+    @Test
+    void shouldRemainLowBatteryWhenGridLoadIsHigh() {
+
+        BatteryStateMachine machine =
+                new BatteryStateMachine();
+
+        machine.updateState(15, false, 90);
+
+        assertEquals(
+                BatteryStateMachine.State.LOW_BATTERY,
+                machine.getCurrentState()
+        );
+    }
 }
