@@ -18,7 +18,8 @@ import gridweaver.statemachine.BatteryStateMachine;
 @Component
 public class TelemetryWebSocketHandler extends TextWebSocketHandler {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper =
+            new ObjectMapper();
 
     private final BatteryStateMachine batteryStateMachine =
             new BatteryStateMachine();
@@ -31,12 +32,17 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
             new CopyOnWriteArraySet<>();
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) {
+    public void afterConnectionEstablished(
+            WebSocketSession session) {
 
         sessions.add(session);
 
         System.out.println(
                 "IoT device connected: " + session.getId()
+        );
+
+        System.out.println(
+                "Active WebSocket sessions: " + sessions.size()
         );
     }
 
@@ -51,7 +57,9 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
 
                 // Read incoming JSON
                 JsonNode data =
-                        objectMapper.readTree(message.getPayload());
+                        objectMapper.readTree(
+                                message.getPayload()
+                        );
 
                 // Validate required telemetry fields
                 if (data == null
@@ -59,7 +67,8 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
                         || !data.hasNonNull("power")) {
 
                     System.out.println(
-                            "Invalid telemetry: deviceId and power are required"
+                            "Invalid telemetry: "
+                            + "deviceId and power are required"
                     );
 
                     return;
@@ -67,10 +76,13 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
 
                 // Validate device ID
                 if (!data.get("deviceId").isTextual()
-                        || data.get("deviceId").asText().isBlank()) {
+                        || data.get("deviceId")
+                        .asText()
+                        .isBlank()) {
 
                     System.out.println(
-                            "Invalid telemetry: deviceId must be a non-empty string"
+                            "Invalid telemetry: "
+                            + "deviceId must be a non-empty string"
                     );
 
                     return;
@@ -80,7 +92,8 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
                 if (!data.get("power").isNumber()) {
 
                     System.out.println(
-                            "Invalid telemetry: power must be numeric"
+                            "Invalid telemetry: "
+                            + "power must be numeric"
                     );
 
                     return;
@@ -96,7 +109,8 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
                 if (power < 0 || power > 100) {
 
                     System.out.println(
-                            "Invalid telemetry: power must be between 0 and 100"
+                            "Invalid telemetry: "
+                            + "power must be between 0 and 100"
                     );
 
                     return;
@@ -129,7 +143,8 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
                                         "deviceId", deviceId,
                                         "power", power,
                                         "charging", charging,
-                                        "state", currentState.toString()
+                                        "state",
+                                        currentState.toString()
                                 )
                         );
 
@@ -159,10 +174,18 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
             WebSocketSession session,
             org.springframework.web.socket.CloseStatus status) {
 
+        // Remove disconnected client
         sessions.remove(session);
 
         System.out.println(
-                "IoT device disconnected: " + session.getId()
+                "IoT device disconnected: "
+                + session.getId()
+        );
+
+        // Show remaining active connections
+        System.out.println(
+                "Active WebSocket sessions: "
+                + sessions.size()
         );
     }
 }
