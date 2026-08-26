@@ -53,13 +53,54 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
                 JsonNode data =
                         objectMapper.readTree(message.getPayload());
 
-                // Get device ID
+                // Validate required telemetry fields
+                if (data == null
+                        || !data.hasNonNull("deviceId")
+                        || !data.hasNonNull("power")) {
+
+                    System.out.println(
+                            "Invalid telemetry: deviceId and power are required"
+                    );
+
+                    return;
+                }
+
+                // Validate device ID
+                if (!data.get("deviceId").isTextual()
+                        || data.get("deviceId").asText().isBlank()) {
+
+                    System.out.println(
+                            "Invalid telemetry: deviceId must be a non-empty string"
+                    );
+
+                    return;
+                }
+
+                // Validate power
+                if (!data.get("power").isNumber()) {
+
+                    System.out.println(
+                            "Invalid telemetry: power must be numeric"
+                    );
+
+                    return;
+                }
+
                 String deviceId =
                         data.get("deviceId").asText();
 
-                // Get power value
                 double power =
                         data.get("power").asDouble();
+
+                // Validate power range
+                if (power < 0 || power > 100) {
+
+                    System.out.println(
+                            "Invalid telemetry: power must be between 0 and 100"
+                    );
+
+                    return;
+                }
 
                 // Week 2 state logic
                 boolean charging = power <= 80;
@@ -82,14 +123,15 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
                 );
 
                 // Create response for frontend
-                String response = objectMapper.writeValueAsString(
-                        java.util.Map.of(
-                                "deviceId", deviceId,
-                                "power", power,
-                                "charging", charging,
-                                "state", currentState.toString()
-                        )
-                );
+                String response =
+                        objectMapper.writeValueAsString(
+                                java.util.Map.of(
+                                        "deviceId", deviceId,
+                                        "power", power,
+                                        "charging", charging,
+                                        "state", currentState.toString()
+                                )
+                        );
 
                 // Send state update to all connected clients
                 for (WebSocketSession client : sessions) {
