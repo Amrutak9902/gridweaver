@@ -6,6 +6,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
@@ -13,6 +14,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import gridweaver.kafka.TelemetryKafkaProducer;
 import gridweaver.statemachine.BatteryStateMachine;
 
 @Component
@@ -21,8 +23,7 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper =
             new ObjectMapper();
 
-    private final BatteryStateMachine batteryStateMachine =
-            new BatteryStateMachine();
+    private final TelemetryKafkaProducer telemetryKafkaProducer;
 
     private final ExecutorService virtualThreadExecutor =
             Executors.newVirtualThreadPerTaskExecutor();
@@ -30,6 +31,12 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
     // Store all connected WebSocket clients
     private final Set<WebSocketSession> sessions =
             new CopyOnWriteArraySet<>();
+
+    public TelemetryWebSocketHandler(
+            TelemetryKafkaProducer telemetryKafkaProducer) {
+
+        this.telemetryKafkaProducer = telemetryKafkaProducer;
+    }
 
     @Override
     public void afterConnectionEstablished(
@@ -42,7 +49,8 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
         );
 
         System.out.println(
-                "Active WebSocket sessions: " + sessions.size()
+                "Active WebSocket sessions: "
+                + sessions.size()
         );
     }
 
@@ -116,48 +124,25 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
                     return;
                 }
 
-                // Week 2 state logic
-                boolean charging = power <= 80;
-
-                // Update state machine
-                batteryStateMachine.updateState(
-                        power,
-                        charging
-                );
-
-                // Get current battery state
-                BatteryStateMachine.State currentState =
-                        batteryStateMachine.getCurrentState();
-
-                System.out.println(
-                        "Device: " + deviceId
-                        + " | Power: " + power
-                        + " | Charging: " + charging
-                        + " | State: " + currentState
-                );
-
-                // Create response for frontend
-                String response =
+                // Create validated telemetry payload
+                String telemetry =
                         objectMapper.writeValueAsString(
                                 java.util.Map.of(
                                         "deviceId", deviceId,
-                                        "power", power,
-                                        "charging", charging,
-                                        "state",
-                                        currentState.toString()
+                                        "power", power
                                 )
                         );
 
-                // Send state update to all connected clients
-                for (WebSocketSession client : sessions) {
+                // Send telemetry to Kafka
+                telemetryKafkaProducer.sendTelemetry(
+                        telemetry
+                );
 
-                    if (client.isOpen()) {
-
-                        client.sendMessage(
-                                new TextMessage(response)
-                        );
-                    }
-                }
+                System.out.println(
+                        "Telemetry forwarded to Kafka | "
+                        + "Device: " + deviceId
+                        + " | Power: " + power
+                );
 
             } catch (Exception e) {
 
@@ -169,10 +154,60 @@ public class TelemetryWebSocketHandler extends TextWebSocketHandler {
         });
     }
 
+    /*
+     * Broadcast the state calculated by the Kafka consumer
+     * to all connected WebSocket clients.
+     */
+    public void broadcastStateUpdate(
+            String deviceId,
+            double power,
+            boolean charging,
+            BatteryStateMachine.State currentState) {
+
+        try {
+
+            String response =
+                    objectMapper.writeValueAsString(
+                            java.util.Map.of(
+                                    "deviceId", deviceId,
+                                    "power", power,
+                                    "charging", charging,
+                                    "state",
+                                    currentState.toString()
+                            )
+                    );
+
+            // Send state update to all connected clients
+            for (WebSocketSession client : sessions) {
+
+                if (client.isOpen()) {
+
+                    client.sendMessage(
+                            new TextMessage(response)
+                    );
+                }
+            }
+
+            System.out.println(
+                    "State update broadcast | Device: "
+                    + deviceId
+                    + " | State: "
+                    + currentState
+            );
+
+        } catch (Exception e) {
+
+            System.out.println(
+                    "Error broadcasting state update: "
+                    + e.getMessage()
+            );
+        }
+    }
+
     @Override
     public void afterConnectionClosed(
             WebSocketSession session,
-            org.springframework.web.socket.CloseStatus status) {
+            CloseStatus status) {
 
         // Remove disconnected client
         sessions.remove(session);
