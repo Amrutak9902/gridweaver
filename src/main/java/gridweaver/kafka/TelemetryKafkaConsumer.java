@@ -12,17 +12,16 @@ import gridweaver.statemachine.BatteryStateMachine;
 @Service
 public class TelemetryKafkaConsumer {
 
-    private final ObjectMapper objectMapper =
-            new ObjectMapper();
-
-    private final BatteryStateMachine batteryStateMachine =
-            new BatteryStateMachine();
-
+    private final ObjectMapper objectMapper;
+    private final BatteryStateMachine batteryStateMachine;
     private final TelemetryWebSocketHandler webSocketHandler;
 
     public TelemetryKafkaConsumer(
+            BatteryStateMachine batteryStateMachine,
             TelemetryWebSocketHandler webSocketHandler) {
 
+        this.objectMapper = new ObjectMapper();
+        this.batteryStateMachine = batteryStateMachine;
         this.webSocketHandler = webSocketHandler;
     }
 
@@ -43,10 +42,11 @@ public class TelemetryKafkaConsumer {
             JsonNode data =
                     objectMapper.readTree(message);
 
-            // Read telemetry values
+            // Read device ID
             String deviceId =
                     data.get("deviceId").asText();
 
+            // Read power value
             double power =
                     data.get("power").asDouble();
 
@@ -75,7 +75,7 @@ public class TelemetryKafkaConsumer {
                     + currentState
             );
 
-            // Send state update back to WebSocket clients
+            // Send update to WebSocket clients
             webSocketHandler.broadcastStateUpdate(
                     deviceId,
                     power,
@@ -85,10 +85,12 @@ public class TelemetryKafkaConsumer {
 
         } catch (Exception e) {
 
-            System.out.println(
+            System.err.println(
                     "Error consuming telemetry from Kafka: "
                     + e.getMessage()
             );
+
+            e.printStackTrace();
         }
     }
 }

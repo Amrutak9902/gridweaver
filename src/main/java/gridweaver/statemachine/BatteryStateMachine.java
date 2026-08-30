@@ -1,5 +1,8 @@
 package gridweaver.statemachine;
 
+import org.springframework.stereotype.Component;
+
+@Component
 public class BatteryStateMachine {
 
     public enum State {
@@ -15,8 +18,11 @@ public class BatteryStateMachine {
         return currentState;
     }
 
-    // Existing logic - keeps the old tests working
-    public void updateState(double batteryLevel, boolean charging) {
+    // Existing Week 1/2 logic
+    // Keeps the old tests working
+    public void updateState(
+            double batteryLevel,
+            boolean charging) {
 
         if (batteryLevel <= 20) {
             currentState = State.LOW_BATTERY;

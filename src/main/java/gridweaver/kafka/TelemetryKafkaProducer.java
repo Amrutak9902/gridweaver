@@ -12,7 +12,6 @@ public class TelemetryKafkaProducer {
 
     public TelemetryKafkaProducer(
             KafkaTemplate<String, String> kafkaTemplate) {
-
         this.kafkaTemplate = kafkaTemplate;
     }
 
@@ -21,7 +20,7 @@ public class TelemetryKafkaProducer {
         kafkaTemplate.send(TOPIC, telemetry);
 
         System.out.println(
-                "Telemetry sent to Kafka topic: " + TOPIC
+                "Telemetry sent to Kafka: " + telemetry
         );
     }
 }
