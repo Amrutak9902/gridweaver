@@ -18,8 +18,7 @@ public class BatteryStateMachine {
         return currentState;
     }
 
-    // Existing Week 1/2 logic
-    // Keeps the old tests working
+    // Existing logic - keeps the old tests working
     public void updateState(
             double batteryLevel,
             boolean charging) {
